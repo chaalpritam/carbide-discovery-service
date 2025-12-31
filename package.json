@@ -1,0 +1,37 @@
+{
+  "name": "carbide-discovery-service",
+  "version": "1.0.0",
+  "description": "Carbide Network Discovery Service - Marketplace for decentralized storage providers",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node --loader tsx src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "carbide",
+    "discovery",
+    "storage",
+    "marketplace",
+    "p2p"
+  ],
+  "author": "Chaal Pritam",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^4.25.2",
+    "@fastify/cors": "^9.0.1",
+    "zod": "^3.22.4",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.6",
+    "tsx": "^4.7.0",
+    "pino-pretty": "^10.3.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
