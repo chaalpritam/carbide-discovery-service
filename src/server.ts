@@ -16,24 +16,27 @@ async function createServer() {
   const config = loadConfig();
 
   // Create Fastify instance with logger
-  const server = Fastify({
-    logger: {
-      level: config.logLevel,
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname'
-        }
-      }
-    }
-  });
+  const loggerOptions: Record<string, unknown> = {
+    level: config.logLevel,
+  };
 
-  // Register CORS plugin (allow all origins for client apps)
+  if (config.nodeEnv !== 'production') {
+    loggerOptions.transport = {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname',
+      },
+    };
+  }
+
+  const server = Fastify({ logger: loggerOptions });
+
+  // Register CORS plugin
   await server.register(cors, {
-    origin: true,
-    credentials: true
+    origin: config.corsOrigin,
+    credentials: true,
   });
 
   // Create discovery service

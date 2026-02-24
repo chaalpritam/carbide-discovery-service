@@ -6,8 +6,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node --loader tsx src/server.ts",
+    "start": "node dist/server.js",
     "build": "tsc",
+    "serve": "npm run build && npm start",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
