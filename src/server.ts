@@ -9,6 +9,7 @@ import { StatsUpdater } from './services/stats-updater.js';
 import { providersRoutes } from './routes/providers.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { healthRoutes } from './routes/health.js';
+import { filesRoutes } from './routes/files.js';
 
 /**
  * Create and configure the Fastify server
@@ -83,6 +84,13 @@ async function createServer() {
   await server.register(
     async (instance) => {
       await healthRoutes(instance);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  await server.register(
+    async (instance) => {
+      await filesRoutes(instance, discoveryService);
     },
     { prefix: '/api/v1' }
   );
