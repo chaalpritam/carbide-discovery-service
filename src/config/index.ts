@@ -12,6 +12,7 @@ export interface DiscoveryConfig {
   logLevel: string;                 // Log level
   nodeEnv: string;                  // Node environment
   corsOrigin: string | boolean;     // CORS origin
+  databasePath: string;             // SQLite database file path
 }
 
 /**
@@ -30,5 +31,6 @@ export function loadConfig(): DiscoveryConfig {
     logLevel: process.env.LOG_LEVEL || 'info',
     nodeEnv,
     corsOrigin,
+    databasePath: process.env.DATABASE_PATH || './data/carbide-discovery.db',
   };
 }
