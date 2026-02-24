@@ -289,6 +289,44 @@ export class ProviderQueries {
     return row.count;
   }
 
+  // ============================================================
+  // File-Provider Mapping Queries
+  // ============================================================
+
+  registerFileProvider(fileId: string, providerId: string, fileSize: number | null): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO file_providers (file_id, provider_id, file_size)
+      VALUES (?, ?, ?)
+    `).run(fileId, providerId, fileSize);
+  }
+
+  removeFileProvider(fileId: string, providerId: string): boolean {
+    const result = this.db.prepare(
+      'DELETE FROM file_providers WHERE file_id = ? AND provider_id = ?'
+    ).run(fileId, providerId);
+    return result.changes > 0;
+  }
+
+  getFileProviders(fileId: string, providerTimeout: number): {
+    provider_id: string;
+    endpoint: string;
+    file_size: number | null;
+    stored_at: string;
+  }[] {
+    const cutoff = new Date(Date.now() - providerTimeout).toISOString();
+    return this.db.prepare(`
+      SELECT fp.provider_id, p.endpoint, fp.file_size, fp.stored_at
+      FROM file_providers fp
+      JOIN providers p ON fp.provider_id = p.id
+      WHERE fp.file_id = ? AND p.last_heartbeat > ?
+      ORDER BY CAST(p.rep_overall AS REAL) DESC
+    `).all(fileId, cutoff) as {
+      provider_id: string;
+      endpoint: string;
+      file_size: number | null;
+      stored_at: string;
+    }[];
+  }
 
   computeStats(providerTimeout: number): MarketplaceStats {
     const cutoff = new Date(Date.now() - providerTimeout).toISOString();
