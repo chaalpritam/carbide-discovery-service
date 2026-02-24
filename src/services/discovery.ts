@@ -227,4 +227,34 @@ export class DiscoveryService {
   getAllEntries(): Map<string, RegistryEntry> {
     return this.queries.getAllEntries();
   }
+
+  // ============================================================
+  // File-Provider Mapping
+  // ============================================================
+
+  /**
+   * Register that a provider holds a file
+   */
+  registerFileProvider(fileId: string, providerId: string, fileSize: number | null): void {
+    this.queries.registerFileProvider(fileId, providerId, fileSize);
+  }
+
+  /**
+   * Remove a file-provider mapping
+   */
+  removeFileProvider(fileId: string, providerId: string): boolean {
+    return this.queries.removeFileProvider(fileId, providerId);
+  }
+
+  /**
+   * Get online providers that hold a specific file
+   */
+  getFileProviders(fileId: string): {
+    provider_id: string;
+    endpoint: string;
+    file_size: number | null;
+    stored_at: string;
+  }[] {
+    return this.queries.getFileProviders(fileId, this.config.providerTimeout);
+  }
 }
