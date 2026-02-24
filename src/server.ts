@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config/index.js';
+import { initDatabase } from './database/index.js';
 import { DiscoveryService } from './services/discovery.js';
 import { HealthChecker } from './services/health-checker.js';
 import { StatsUpdater } from './services/stats-updater.js';
@@ -15,6 +16,9 @@ import { healthRoutes } from './routes/health.js';
 async function createServer() {
   // Load configuration
   const config = loadConfig();
+
+  // Initialize SQLite database
+  const db = initDatabase(config.databasePath);
 
   // Create Fastify instance with logger
   const loggerOptions: Record<string, unknown> = {
@@ -58,8 +62,8 @@ async function createServer() {
     }
   });
 
-  // Create discovery service
-  const discoveryService = new DiscoveryService(config);
+  // Create discovery service with database
+  const discoveryService = new DiscoveryService(config, db);
 
   // Register routes
   await server.register(
@@ -105,6 +109,7 @@ async function createServer() {
       server.log.info(`Received ${signal}, shutting down gracefully...`);
       healthChecker.stop();
       statsUpdater.stop();
+      db.close();
       await server.close();
       process.exit(0);
     });
