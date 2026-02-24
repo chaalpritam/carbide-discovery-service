@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config/index.js';
 import { DiscoveryService } from './services/discovery.js';
 import { HealthChecker } from './services/health-checker.js';
@@ -37,6 +38,24 @@ async function createServer() {
   await server.register(cors, {
     origin: config.corsOrigin,
     credentials: true,
+  });
+
+  // Register rate limiting
+  await server.register(rateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: '1 minute',
+  });
+
+  // Stricter rate limit for mutating endpoints
+  server.addHook('onRoute', (routeOptions) => {
+    if (routeOptions.method === 'POST' || routeOptions.method === 'DELETE') {
+      const existing = routeOptions.config || {};
+      routeOptions.config = {
+        ...existing,
+        rateLimit: { max: 20, timeWindow: '1 minute' },
+      };
+    }
   });
 
   // Create discovery service
