@@ -177,17 +177,38 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   );
   statsUpdater.start();
 
-  // Graceful shutdown
+  // Graceful shutdown with 30-second timeout
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   signals.forEach((signal) => {
     process.on(signal, async () => {
       server.log.info(`Received ${signal}, shutting down gracefully...`);
       healthChecker.stop();
       statsUpdater.stop();
-      db.close();
-      await server.close();
+
+      // Force exit if graceful close takes too long (e.g. stuck connections)
+      const forceTimer = setTimeout(() => {
+        server.log.error('Graceful shutdown timed out after 30s, forcing exit');
+        process.exit(1);
+      }, 30_000);
+      forceTimer.unref();
+
+      try {
+        await server.close();
+      } finally {
+        db.close();
+      }
       process.exit(0);
     });
+  });
+
+  // Crash handlers — log and exit rather than silently dying
+  process.on('uncaughtException', (err) => {
+    server.log.fatal({ err }, 'Uncaught exception');
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    server.log.fatal({ reason }, 'Unhandled promise rejection');
+    process.exit(1);
   });
 
   return { server, config, db };
