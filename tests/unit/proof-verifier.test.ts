@@ -4,6 +4,7 @@ import { initDatabase } from '../../src/database/index.js';
 import { ProofVerifierService, type ProofSubmission } from '../../src/services/proof-verifier.js';
 import { PaymentSigner } from '../../src/services/payment-signer.js';
 import { ContractService } from '../../src/services/contract-service.js';
+import { ReputationService } from '../../src/services/reputation-service.js';
 import { randomUUID } from 'node:crypto';
 import { ethers } from 'ethers';
 
@@ -11,6 +12,7 @@ describe('ProofVerifierService', () => {
   let db: Database.Database;
   let verifier: ProofVerifierService;
   let contractService: ContractService;
+  let reputationService: ReputationService;
   let defaultProviderId: string;
 
   const insertProvider = (id: string) => {
@@ -49,7 +51,8 @@ describe('ProofVerifierService', () => {
   beforeEach(() => {
     db = initDatabase(':memory:');
     contractService = new ContractService(db);
-    verifier = new ProofVerifierService(db, null);
+    reputationService = new ReputationService(db);
+    verifier = new ProofVerifierService(db, null, reputationService);
 
     defaultProviderId = randomUUID();
     insertProvider(defaultProviderId);
@@ -200,6 +203,47 @@ describe('ProofVerifierService', () => {
 
       const history = verifier.getProofHistory(contract.id);
       expect(history.length).toBe(2);
+    });
+  });
+
+  describe('reputation integration', () => {
+    it('emits proof_success reputation event on valid proof', async () => {
+      const contract = createActiveContract();
+      await verifier.verifyProof(contract.id, validProof);
+
+      const events = db.prepare(
+        "SELECT * FROM reputation_events WHERE provider_id = ? AND event_type = 'proof_success'"
+      ).all(defaultProviderId) as { event_type: string; severity: string; contract_id: string }[];
+      expect(events.length).toBe(1);
+      expect(events[0].severity).toBe('positive');
+      expect(events[0].contract_id).toBe(contract.id);
+    });
+
+    it('emits proof_failure reputation event on invalid proof', async () => {
+      const contract = createActiveContract();
+      const invalidProof: ProofSubmission = {
+        challenge_id: '',
+        response_hash: '',
+        merkle_proofs: [],
+      };
+      await verifier.verifyProof(contract.id, invalidProof);
+
+      const events = db.prepare(
+        "SELECT * FROM reputation_events WHERE provider_id = ? AND event_type = 'proof_failure'"
+      ).all(defaultProviderId) as { event_type: string; severity: string }[];
+      expect(events.length).toBe(1);
+      expect(events[0].severity).toBe('negative');
+    });
+
+    it('updates rep_data_integrity after proof events', async () => {
+      const contract = createActiveContract();
+
+      // Submit a valid proof
+      await verifier.verifyProof(contract.id, validProof);
+
+      const provider = db.prepare('SELECT rep_data_integrity FROM providers WHERE id = ?').get(defaultProviderId) as { rep_data_integrity: string };
+      // After one proof_success with no failures, data_integrity should be 1.0
+      expect(parseFloat(provider.rep_data_integrity)).toBe(1.0);
     });
   });
 });

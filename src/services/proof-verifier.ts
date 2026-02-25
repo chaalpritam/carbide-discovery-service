@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { ContractService } from './contract-service.js';
 import { PaymentSigner } from './payment-signer.js';
+import { ReputationService } from './reputation-service.js';
 
 export interface ProofSubmission {
   challenge_id: string;
@@ -19,11 +20,13 @@ export class ProofVerifierService {
   private db: Database.Database;
   private contractService: ContractService;
   private paymentSigner: PaymentSigner | null;
+  private reputationService: ReputationService | null;
 
-  constructor(db: Database.Database, paymentSigner: PaymentSigner | null) {
+  constructor(db: Database.Database, paymentSigner: PaymentSigner | null, reputationService?: ReputationService | null) {
     this.db = db;
     this.contractService = new ContractService(db);
     this.paymentSigner = paymentSigner;
+    this.reputationService = reputationService ?? null;
   }
 
   async verifyProof(contractId: string, proof: ProofSubmission): Promise<ProofVerificationResult> {
@@ -59,6 +62,17 @@ export class ProofVerifierService {
         ).run(contractId);
       }
 
+      // Emit reputation event for proof failure
+      if (this.reputationService) {
+        this.reputationService.recordEvent({
+          provider_id: contract.provider_id,
+          event_type: 'proof_failure',
+          severity: 'negative',
+          contract_id: contractId,
+        });
+        this.reputationService.recalculateScore(contract.provider_id);
+      }
+
       return { valid: false, message: 'Proof verification failed' };
     }
 
@@ -66,6 +80,20 @@ export class ProofVerifierService {
     this.db.prepare(
       `UPDATE storage_contracts SET proofs_submitted = proofs_submitted + 1, proofs_failed = 0, last_proof_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
     ).run(contractId);
+
+    // Emit reputation event for proof success
+    if (this.reputationService) {
+      const startTime = Date.now();
+      const responseTimeMs = Date.now() - startTime;
+      this.reputationService.recordEvent({
+        provider_id: contract.provider_id,
+        event_type: 'proof_success',
+        severity: 'positive',
+        value: responseTimeMs,
+        contract_id: contractId,
+      });
+      this.reputationService.recalculateScore(contract.provider_id);
+    }
 
     // Check if a payment period is due and sign attestation
     const period = contract.proofs_submitted + 1;

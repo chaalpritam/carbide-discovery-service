@@ -140,7 +140,9 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
     ? new PaymentSigner(config.verifierPrivateKey, config.chainId, config.escrowContract)
     : null;
 
-  const proofVerifier = new ProofVerifierService(db, paymentSigner);
+  const reputationService = new ReputationService(db);
+
+  const proofVerifier = new ProofVerifierService(db, paymentSigner, reputationService);
 
   // Register routes
   await server.register(
@@ -198,8 +200,6 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
     },
     { prefix: '/api/v1' }
   );
-
-  const reputationService = new ReputationService(db);
   await server.register(
     async (instance) => {
       await reputationRoutes(instance, reputationService);
