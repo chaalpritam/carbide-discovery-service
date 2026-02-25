@@ -15,6 +15,9 @@ import { filesRoutes } from './routes/files.js';
 import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
 import { contractsRoutes } from './routes/contracts.js';
+import { proofsRoutes } from './routes/proofs.js';
+import { PaymentSigner } from './services/payment-signer.js';
+import { ProofVerifierService } from './services/proof-verifier.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -124,6 +127,13 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
 
+  // Create payment signer (only if verifier key is configured)
+  const paymentSigner = config.verifierPrivateKey
+    ? new PaymentSigner(config.verifierPrivateKey, config.chainId, config.escrowContract)
+    : null;
+
+  const proofVerifier = new ProofVerifierService(db, paymentSigner);
+
   // Register routes
   await server.register(
     async (instance) => {
@@ -170,6 +180,13 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   await server.register(
     async (instance) => {
       await contractsRoutes(instance, db);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  await server.register(
+    async (instance) => {
+      await proofsRoutes(instance, proofVerifier);
     },
     { prefix: '/api/v1' }
   );
