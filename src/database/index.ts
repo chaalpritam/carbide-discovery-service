@@ -36,7 +36,7 @@ function runMigrations(db: Database.Database): void {
   `);
 
   const migrationDir = resolve(__dirname, 'migrations');
-  const migrationFiles = ['001_initial.sql', '002_file_providers.sql'];
+  const migrationFiles = ['001_initial.sql', '002_file_providers.sql', '003_api_keys.sql'];
 
   const applied = new Set(
     db.prepare('SELECT name FROM _migrations').all()

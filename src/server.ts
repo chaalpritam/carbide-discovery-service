@@ -1,7 +1,9 @@
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { loadConfig } from './config/index.js';
+import type Database from 'better-sqlite3';
+import { loadConfig, type DiscoveryConfig } from './config/index.js';
 import { initDatabase } from './database/index.js';
 import { DiscoveryService } from './services/discovery.js';
 import { HealthChecker } from './services/health-checker.js';
@@ -10,11 +12,13 @@ import { providersRoutes } from './routes/providers.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { healthRoutes } from './routes/health.js';
 import { filesRoutes } from './routes/files.js';
+import { authRoutes } from './routes/auth.js';
+import { createAuthHook } from './middleware/auth.js';
 
 /**
  * Create and configure the Fastify server
  */
-async function createServer() {
+async function createServer(): Promise<{ server: FastifyInstance; config: DiscoveryConfig; db: Database.Database }> {
   // Load configuration
   const config = loadConfig();
 
@@ -63,6 +67,10 @@ async function createServer() {
     }
   });
 
+  // API key / JWT authentication
+  const authHook = createAuthHook(db, config.authEnabled, config.jwtSecret);
+  server.addHook('onRequest', authHook);
+
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
 
@@ -95,6 +103,13 @@ async function createServer() {
     { prefix: '/api/v1' }
   );
 
+  await server.register(
+    async (instance) => {
+      await authRoutes(instance, db, config.authSecret, config.jwtSecret, config.jwtExpiresIn);
+    },
+    { prefix: '/api/v1' }
+  );
+
   // Start background tasks
   const healthChecker = new HealthChecker(
     discoveryService,
@@ -123,7 +138,7 @@ async function createServer() {
     });
   });
 
-  return { server, config };
+  return { server, config, db };
 }
 
 /**

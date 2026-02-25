@@ -13,6 +13,10 @@ export interface DiscoveryConfig {
   nodeEnv: string;                  // Node environment
   corsOrigin: string | boolean;     // CORS origin
   databasePath: string;             // SQLite database file path
+  authEnabled: boolean;             // Enable API key authentication
+  authSecret: string;               // Secret for bootstrap endpoint
+  jwtSecret: string;                // Secret for signing JWTs
+  jwtExpiresIn: string;             // JWT token expiry (e.g., '1h', '30m')
 }
 
 /**
@@ -32,5 +36,9 @@ export function loadConfig(): DiscoveryConfig {
     nodeEnv,
     corsOrigin,
     databasePath: process.env.DATABASE_PATH || './data/carbide-discovery.db',
+    authEnabled: process.env.AUTH_ENABLED !== 'false',
+    authSecret: process.env.AUTH_SECRET || 'changeme-in-production',
+    jwtSecret: process.env.JWT_SECRET || 'jwt-changeme-in-production',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
   };
 }
