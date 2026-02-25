@@ -14,6 +14,7 @@ import { healthRoutes } from './routes/health.js';
 import { filesRoutes } from './routes/files.js';
 import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
+import { contractsRoutes } from './routes/contracts.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -162,6 +163,13 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   await server.register(
     async (instance) => {
       await usersRoutes(instance, db);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  await server.register(
+    async (instance) => {
+      await contractsRoutes(instance, db);
     },
     { prefix: '/api/v1' }
   );
