@@ -25,6 +25,23 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   // Load configuration
   const config = loadConfig();
 
+  // Validate secrets are not using dangerous defaults
+  if (config.nodeEnv === 'production') {
+    if (config.authSecret.includes('changeme')) {
+      throw new Error('AUTH_SECRET must be changed from default in production. Set the AUTH_SECRET environment variable.');
+    }
+    if (config.jwtSecret.includes('changeme')) {
+      throw new Error('JWT_SECRET must be changed from default in production. Set the JWT_SECRET environment variable.');
+    }
+  } else if (config.authEnabled) {
+    if (config.authSecret.includes('changeme')) {
+      console.warn('⚠️  AUTH_SECRET is using the default value. Set AUTH_SECRET env var before deploying.');
+    }
+    if (config.jwtSecret.includes('changeme')) {
+      console.warn('⚠️  JWT_SECRET is using the default value. Set JWT_SECRET env var before deploying.');
+    }
+  }
+
   // Initialize SQLite database
   const db = initDatabase(config.databasePath);
 
