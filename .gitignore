@@ -8,6 +8,13 @@ pnpm-lock.yaml
 dist/
 build/
 *.tsbuildinfo
+.next/
+
+# Compiled test files (tsc output outside dist/)
+tests/**/*.js
+tests/**/*.js.map
+tests/**/*.d.ts
+tests/**/*.d.ts.map
 
 # Environment variables
 .env
