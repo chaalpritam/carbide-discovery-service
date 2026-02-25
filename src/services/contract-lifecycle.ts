@@ -3,13 +3,11 @@ import { ContractService } from './contract-service.js';
 import { ReputationService } from './reputation-service.js';
 
 export class ContractLifecycleManager {
-  private db: Database.Database;
   private contractService: ContractService;
   private reputationService: ReputationService;
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
-  constructor(db: Database.Database, contractService: ContractService, reputationService: ReputationService) {
-    this.db = db;
+  constructor(_db: Database.Database, contractService: ContractService, reputationService: ReputationService) {
     this.contractService = contractService;
     this.reputationService = reputationService;
   }
