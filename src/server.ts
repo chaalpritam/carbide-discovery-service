@@ -14,6 +14,9 @@ import { healthRoutes } from './routes/health.js';
 import { filesRoutes } from './routes/files.js';
 import { authRoutes } from './routes/auth.js';
 import { createAuthHook } from './middleware/auth.js';
+import helmet from '@fastify/helmet';
+import { requestIdHook } from './middleware/request-id.js';
+import { createAuditLogger } from './middleware/audit-logger.js';
 
 /**
  * Create and configure the Fastify server
@@ -67,9 +70,28 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
     }
   });
 
+  // Security headers (CSP, HSTS, X-Frame-Options, etc.)
+  await server.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+      },
+    },
+  });
+
+  // Hook order: requestId → auth → audit
+  server.addHook('onRequest', requestIdHook);
+
   // API key / JWT authentication
   const authHook = createAuthHook(db, config.authEnabled, config.jwtSecret);
   server.addHook('onRequest', authHook);
+
+  // Audit logging for mutations and errors
+  const auditLogger = createAuditLogger(db);
+  server.addHook('onRequest', auditLogger.onRequest);
+  server.addHook('onResponse', auditLogger.onResponse);
 
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
