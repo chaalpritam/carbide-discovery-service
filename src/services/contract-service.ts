@@ -108,4 +108,28 @@ export class ContractService {
       "SELECT * FROM storage_contracts WHERE provider_id = ? AND status = 'active'"
     ).all(providerId) as StorageContractRecord[];
   }
+
+  getExpiredContracts(): StorageContractRecord[] {
+    return this.db.prepare(
+      `SELECT * FROM storage_contracts
+       WHERE status = 'active'
+         AND datetime(created_at, '+' || duration_months || ' months') < datetime('now')`
+    ).all() as StorageContractRecord[];
+  }
+
+  getStaleContracts(hoursThreshold: number = 48): StorageContractRecord[] {
+    return this.db.prepare(
+      `SELECT * FROM storage_contracts
+       WHERE status = 'active'
+         AND last_proof_at IS NOT NULL
+         AND last_proof_at < datetime('now', ? || ' hours')
+         AND created_at < datetime('now', '-48 hours')`
+    ).all(`-${hoursThreshold}`) as StorageContractRecord[];
+  }
+
+  updateStatus(contractId: string, newStatus: string): void {
+    this.db.prepare(
+      `UPDATE storage_contracts SET status = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(newStatus, contractId);
+  }
 }

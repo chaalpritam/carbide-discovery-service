@@ -26,6 +26,8 @@ import { DisputeService } from './services/dispute-service.js';
 import { disputesRoutes } from './routes/disputes.js';
 import { AnalyticsService } from './services/analytics-service.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { ContractLifecycleManager } from './services/contract-lifecycle.js';
+import { ContractService } from './services/contract-service.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -253,6 +255,13 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   );
   statsUpdater.start();
 
+  const contractLifecycle = new ContractLifecycleManager(
+    db,
+    new ContractService(db),
+    reputationService
+  );
+  contractLifecycle.start(60_000);
+
   // Graceful shutdown with 30-second timeout
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   signals.forEach((signal) => {
@@ -260,6 +269,7 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
       server.log.info(`Received ${signal}, shutting down gracefully...`);
       healthChecker.stop();
       statsUpdater.stop();
+      contractLifecycle.stop();
 
       // Force exit if graceful close takes too long (e.g. stuck connections)
       const forceTimer = setTimeout(() => {
