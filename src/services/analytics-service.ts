@@ -130,6 +130,103 @@ export class AnalyticsService {
     }));
   }
 
+  recordDailySnapshot(): void {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const providers = this.db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN health_status = 'Healthy' THEN 1 END) as online
+      FROM providers
+    `).get() as { total: number; online: number };
+
+    const storage = this.db.prepare(`
+      SELECT
+        COALESCE(SUM(total_capacity), 0) as total_bytes,
+        COALESCE(SUM(total_capacity - available_storage), 0) as used_bytes
+      FROM providers
+    `).get() as { total_bytes: number; used_bytes: number };
+
+    const contracts = this.db.prepare(`
+      SELECT
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+        COUNT(CASE WHEN DATE(created_at) = ? THEN 1 END) as new_today,
+        COALESCE(SUM(CAST(total_escrowed AS REAL)), 0) as escrowed
+      FROM storage_contracts
+    `).get(today) as { active: number; new_today: number; escrowed: number };
+
+    const pricing = this.db.prepare(`
+      SELECT COALESCE(AVG(CAST(price_per_gb_month AS REAL)), 0) as avg_price
+      FROM providers WHERE health_status = 'Healthy'
+    `).get() as { avg_price: number };
+
+    // Upsert: insert or replace if same date
+    this.db.prepare(`
+      INSERT INTO usage_snapshots (snapshot_date, total_providers, online_providers, total_storage_bytes, used_storage_bytes, active_contracts, new_contracts_today, total_escrowed, avg_price_per_gb)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(snapshot_date) DO UPDATE SET
+        total_providers = excluded.total_providers,
+        online_providers = excluded.online_providers,
+        total_storage_bytes = excluded.total_storage_bytes,
+        used_storage_bytes = excluded.used_storage_bytes,
+        active_contracts = excluded.active_contracts,
+        new_contracts_today = excluded.new_contracts_today,
+        total_escrowed = excluded.total_escrowed,
+        avg_price_per_gb = excluded.avg_price_per_gb
+    `).run(
+      today,
+      providers.total,
+      providers.online,
+      storage.total_bytes,
+      storage.used_bytes,
+      contracts.active,
+      contracts.new_today,
+      contracts.escrowed.toString(),
+      pricing.avg_price.toFixed(6),
+    );
+  }
+
+  getStorageTrend(days: number = 30): { date: string; total_bytes: number; used_bytes: number }[] {
+    return this.db.prepare(`
+      SELECT snapshot_date as date, total_storage_bytes as total_bytes, used_storage_bytes as used_bytes
+      FROM usage_snapshots
+      WHERE snapshot_date >= DATE('now', ? || ' days')
+      ORDER BY snapshot_date ASC
+    `).all(`-${days}`) as { date: string; total_bytes: number; used_bytes: number }[];
+  }
+
+  getContractTrend(days: number = 30): { date: string; active: number; new_today: number }[] {
+    return this.db.prepare(`
+      SELECT snapshot_date as date, active_contracts as active, new_contracts_today as new_today
+      FROM usage_snapshots
+      WHERE snapshot_date >= DATE('now', ? || ' days')
+      ORDER BY snapshot_date ASC
+    `).all(`-${days}`) as { date: string; active: number; new_today: number }[];
+  }
+
+  getProviderGrowth(days: number = 30): { date: string; total: number; online: number }[] {
+    return this.db.prepare(`
+      SELECT snapshot_date as date, total_providers as total, online_providers as online
+      FROM usage_snapshots
+      WHERE snapshot_date >= DATE('now', ? || ' days')
+      ORDER BY snapshot_date ASC
+    `).all(`-${days}`) as { date: string; total: number; online: number }[];
+  }
+
+  getPriceTrend(days: number = 30): { date: string; avg_price: string; min_price: string; max_price: string }[] {
+    // Use snapshots for average, compute min/max from the avg_price_per_gb column
+    return this.db.prepare(`
+      SELECT
+        snapshot_date as date,
+        avg_price_per_gb as avg_price,
+        avg_price_per_gb as min_price,
+        avg_price_per_gb as max_price
+      FROM usage_snapshots
+      WHERE snapshot_date >= DATE('now', ? || ' days')
+      ORDER BY snapshot_date ASC
+    `).all(`-${days}`) as { date: string; avg_price: string; min_price: string; max_price: string }[];
+  }
+
   getMarketplaceOverview(): MarketplaceOverview {
     const contracts = this.db.prepare(
       `SELECT

@@ -39,4 +39,36 @@ export async function analyticsRoutes(
     const overview = analyticsService.getMarketplaceOverview();
     return reply.send(overview);
   });
+
+  // Trending: storage capacity over time
+  instance.get('/analytics/trending/storage', async (request, reply) => {
+    const query = request.query as { days?: string };
+    const days = query.days ? parseInt(query.days, 10) : 30;
+    const data = analyticsService.getStorageTrend(days);
+    return reply.send({ data, days });
+  });
+
+  // Trending: contract activity over time
+  instance.get('/analytics/trending/contracts', async (request, reply) => {
+    const query = request.query as { days?: string };
+    const days = query.days ? parseInt(query.days, 10) : 30;
+    const data = analyticsService.getContractTrend(days);
+    return reply.send({ data, days });
+  });
+
+  // Trending: provider growth over time
+  instance.get('/analytics/trending/providers', async (request, reply) => {
+    const query = request.query as { days?: string };
+    const days = query.days ? parseInt(query.days, 10) : 30;
+    const data = analyticsService.getProviderGrowth(days);
+    return reply.send({ data, days });
+  });
+
+  // Trending: pricing over time
+  instance.get('/analytics/trending/pricing', async (request, reply) => {
+    const query = request.query as { days?: string };
+    const days = query.days ? parseInt(query.days, 10) : 30;
+    const data = analyticsService.getPriceTrend(days);
+    return reply.send({ data, days });
+  });
 }
