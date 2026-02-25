@@ -16,3 +16,6 @@ export * from './storage.js';
 
 // Network message types
 export * from './network.js';
+
+// User types
+export * from './user.js';

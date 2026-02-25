@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Provider, ProviderListRequest } from '../types/index.js';
+import type { User } from '../types/index.js';
 import type { RegistryEntry, MarketplaceStats } from '../services/discovery.js';
 import { ServiceStatus } from '../types/index.js';
 import { ProviderTier, Region } from '../types/index.js';
@@ -355,5 +356,67 @@ export class ProviderQueries {
       total_requests: 0, // Tracked in-memory by the service
       last_updated: new Date(),
     };
+  }
+}
+
+// ============================================================
+// User Queries
+// ============================================================
+
+interface UserRow {
+  id: string;
+  wallet_address: string;
+  display_name: string | null;
+  public_key: string | null;
+  created_at: string;
+  last_seen: string;
+  is_active: number;
+  metadata: string;
+}
+
+function rowToUser(row: UserRow): User {
+  return {
+    id: row.id,
+    wallet_address: row.wallet_address,
+    display_name: row.display_name,
+    public_key: row.public_key,
+    created_at: row.created_at,
+    last_seen: row.last_seen,
+    is_active: row.is_active === 1,
+    metadata: JSON.parse(row.metadata),
+  };
+}
+
+export class UserQueries {
+  private db: Database.Database;
+
+  constructor(db: Database.Database) {
+    this.db = db;
+  }
+
+  insertUser(user: { id: string; wallet_address: string; display_name?: string; public_key?: string; metadata?: Record<string, string> }): void {
+    this.db.prepare(
+      `INSERT INTO users (id, wallet_address, display_name, public_key, metadata)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(user.id, user.wallet_address, user.display_name ?? null, user.public_key ?? null, JSON.stringify(user.metadata ?? {}));
+  }
+
+  getByWallet(walletAddress: string): User | null {
+    const row = this.db.prepare('SELECT * FROM users WHERE wallet_address = ?').get(walletAddress) as UserRow | undefined;
+    if (!row) return null;
+    return rowToUser(row);
+  }
+
+  updateUser(walletAddress: string, updates: { display_name?: string; public_key?: string; metadata?: Record<string, string> }): boolean {
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    if (updates.display_name !== undefined) { sets.push('display_name = ?'); values.push(updates.display_name); }
+    if (updates.public_key !== undefined) { sets.push('public_key = ?'); values.push(updates.public_key); }
+    if (updates.metadata !== undefined) { sets.push('metadata = ?'); values.push(JSON.stringify(updates.metadata)); }
+    if (sets.length === 0) return false;
+    sets.push("last_seen = datetime('now')");
+    values.push(walletAddress);
+    const result = this.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE wallet_address = ?`).run(...values);
+    return result.changes > 0;
   }
 }

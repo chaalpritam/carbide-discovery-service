@@ -38,6 +38,7 @@ export interface Provider {
   reputation: ReputationScore;      // Reputation metrics
   last_seen: string;                // ISO 8601 timestamp
   metadata: Record<string, string>; // Provider-specific metadata
+  wallet_address?: string;          // Ethereum wallet address
 }
 
 /**
