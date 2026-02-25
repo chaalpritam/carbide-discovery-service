@@ -17,6 +17,8 @@ import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
 import { createAuditLogger } from './middleware/audit-logger.js';
+import { metricsOnRequest, metricsOnResponse } from './middleware/metrics.js';
+import { metricsRoutes } from './routes/metrics.js';
 
 /**
  * Create and configure the Fastify server
@@ -110,6 +112,10 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   server.addHook('onRequest', auditLogger.onRequest);
   server.addHook('onResponse', auditLogger.onResponse);
 
+  // Prometheus metrics collection
+  server.addHook('onRequest', metricsOnRequest);
+  server.addHook('onResponse', metricsOnResponse);
+
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
 
@@ -147,6 +153,13 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
       await authRoutes(instance, db, config.authSecret, config.jwtSecret, config.jwtExpiresIn);
     },
     { prefix: '/api/v1' }
+  );
+
+  // Metrics endpoint (Prometheus scrape target, no prefix)
+  await server.register(
+    async (instance) => {
+      await metricsRoutes(instance);
+    }
   );
 
   // Start background tasks

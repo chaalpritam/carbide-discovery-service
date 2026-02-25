@@ -24,23 +24,24 @@
   "author": "Chaal Pritam",
   "license": "MIT",
   "dependencies": {
-    "fastify": "^4.25.2",
     "@fastify/cors": "^9.0.1",
     "@fastify/helmet": "^11.1.1",
-    "zod": "^3.22.4",
-    "dotenv": "^16.3.1",
     "@fastify/rate-limit": "^9.1.0",
     "better-sqlite3": "^11.7.0",
-    "jsonwebtoken": "^9.0.3"
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.2",
+    "jsonwebtoken": "^9.0.3",
+    "prom-client": "^15.1.3",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/node": "^20.10.6",
     "@types/better-sqlite3": "^7.6.12",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.10.6",
     "@vitest/coverage-v8": "^4.0.18",
     "pino-pretty": "^10.3.1",
     "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
     "vitest": "^4.0.18"
   },
   "engines": {
