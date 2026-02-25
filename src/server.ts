@@ -22,6 +22,8 @@ import { ReputationService } from './services/reputation-service.js';
 import { reputationRoutes } from './routes/reputation.js';
 import { PricingService } from './services/pricing-service.js';
 import { pricingRoutes } from './routes/pricing.js';
+import { DisputeService } from './services/dispute-service.js';
+import { disputesRoutes } from './routes/disputes.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -207,6 +209,14 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   await server.register(
     async (instance) => {
       await pricingRoutes(instance, pricingService);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  const disputeService = new DisputeService(db);
+  await server.register(
+    async (instance) => {
+      await disputesRoutes(instance, disputeService);
     },
     { prefix: '/api/v1' }
   );
