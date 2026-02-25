@@ -20,6 +20,8 @@ import { PaymentSigner } from './services/payment-signer.js';
 import { ProofVerifierService } from './services/proof-verifier.js';
 import { ReputationService } from './services/reputation-service.js';
 import { reputationRoutes } from './routes/reputation.js';
+import { PricingService } from './services/pricing-service.js';
+import { pricingRoutes } from './routes/pricing.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -197,6 +199,14 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   await server.register(
     async (instance) => {
       await reputationRoutes(instance, reputationService);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  const pricingService = new PricingService(db);
+  await server.register(
+    async (instance) => {
+      await pricingRoutes(instance, pricingService);
     },
     { prefix: '/api/v1' }
   );
