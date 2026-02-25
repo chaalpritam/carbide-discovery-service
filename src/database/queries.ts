@@ -261,11 +261,26 @@ export class ProviderQueries {
     const countRow = this.db.prepare(countSql).get(params) as { count: number };
     const totalCount = countRow.count;
 
-    // Get providers sorted by reputation descending
+    // Determine sort order
+    let orderClause: string;
+    switch (request.sort_by) {
+      case 'price':
+        orderClause = 'ORDER BY CAST(price_per_gb_month AS REAL) ASC';
+        break;
+      case 'value':
+        // Composite: high reputation + low normalized price
+        orderClause = `ORDER BY (CAST(rep_overall AS REAL) * 0.6 + (1.0 - MIN(CAST(price_per_gb_month AS REAL) / 0.02, 1.0)) * 0.4) DESC`;
+        break;
+      case 'reputation':
+      default:
+        orderClause = 'ORDER BY CAST(rep_overall AS REAL) DESC';
+        break;
+    }
+
     const selectSql = `
       SELECT * FROM providers
       ${whereClause}
-      ORDER BY CAST(rep_overall AS REAL) DESC
+      ${orderClause}
       LIMIT @limit
     `;
     const rows = this.db.prepare(selectSql).all({ ...params, limit }) as ProviderRow[];

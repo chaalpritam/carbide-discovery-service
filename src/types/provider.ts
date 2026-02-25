@@ -59,6 +59,7 @@ export interface ProviderListRequest {
   tier?: ProviderTier | null;       // Optional tier filter
   limit?: number | null;            // Max providers to return
   min_reputation?: string | null;   // Minimum reputation score
+  sort_by?: 'reputation' | 'price' | 'value' | null; // Sort order
 }
 
 /**
@@ -101,7 +102,8 @@ export const ProviderListRequestSchema = z.object({
   region: RegionSchema.nullable().optional(),
   tier: ProviderTierSchema.nullable().optional(),
   limit: z.number().int().positive().nullable().optional(),
-  min_reputation: z.string().nullable().optional()
+  min_reputation: z.string().nullable().optional(),
+  sort_by: z.enum(['reputation', 'price', 'value']).nullable().optional(),
 });
 
 export const ProviderListResponseSchema = z.object({

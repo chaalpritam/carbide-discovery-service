@@ -48,6 +48,26 @@ export async function marketplaceRoutes(
   });
 
   /**
+   * GET /api/v1/marketplace/top-providers
+   * Get top-ranked providers by reputation
+   */
+  fastify.get('/marketplace/top-providers', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const query = request.query as { limit?: string };
+      const limit = query.limit ? parseInt(query.limit, 10) : 10;
+      const response = discoveryService.searchProviders({
+        sort_by: 'reputation',
+        limit,
+        min_reputation: '0.01',
+      });
+      return reply.code(200).send(response);
+    } catch (error) {
+      fastify.log.error({ err: error }, 'Failed to get top providers');
+      return reply.code(500).send({ error: 'Failed to get top providers' });
+    }
+  });
+
+  /**
    * GET /api/v1/marketplace/stats
    * Get marketplace statistics
    */
