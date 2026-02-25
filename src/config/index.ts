@@ -22,6 +22,30 @@ export interface DiscoveryConfig {
 /**
  * Load configuration from environment variables
  */
+/**
+ * Validate configuration values before starting the server.
+ *
+ * Catches misconfigurations early (invalid port, zero intervals) instead of
+ * crashing at runtime with confusing errors.
+ */
+export function validateConfig(config: DiscoveryConfig): void {
+  if (config.port < 1 || config.port > 65535) {
+    throw new Error(`Invalid port ${config.port}: must be between 1 and 65535`);
+  }
+  if (config.healthCheckInterval <= 0) {
+    throw new Error(`healthCheckInterval must be > 0 (got ${config.healthCheckInterval})`);
+  }
+  if (config.providerTimeout <= 0) {
+    throw new Error(`providerTimeout must be > 0 (got ${config.providerTimeout})`);
+  }
+  if (config.maxSearchResults < 1 || config.maxSearchResults > 1000) {
+    throw new Error(`maxSearchResults must be between 1 and 1000 (got ${config.maxSearchResults})`);
+  }
+}
+
+/**
+ * Load configuration from environment variables
+ */
 export function loadConfig(): DiscoveryConfig {
   const nodeEnv = process.env.NODE_ENV || 'development';
   const corsOrigin = process.env.CORS_ORIGIN || (nodeEnv === 'production' ? 'https://carbide.network' : true);

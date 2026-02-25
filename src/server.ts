@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import type Database from 'better-sqlite3';
-import { loadConfig, type DiscoveryConfig } from './config/index.js';
+import { loadConfig, validateConfig, type DiscoveryConfig } from './config/index.js';
 import { initDatabase } from './database/index.js';
 import { DiscoveryService } from './services/discovery.js';
 import { HealthChecker } from './services/health-checker.js';
@@ -26,6 +26,9 @@ import { metricsRoutes } from './routes/metrics.js';
 async function createServer(): Promise<{ server: FastifyInstance; config: DiscoveryConfig; db: Database.Database }> {
   // Load configuration
   const config = loadConfig();
+
+  // Validate numeric/structural constraints
+  validateConfig(config);
 
   // Validate secrets are not using dangerous defaults
   if (config.nodeEnv === 'production') {
