@@ -30,6 +30,8 @@ import { ContractLifecycleManager } from './services/contract-lifecycle.js';
 import { ContractService } from './services/contract-service.js';
 import { WebhookService } from './services/webhook-service.js';
 import { webhooksRoutes } from './routes/webhooks.js';
+import { AdminService } from './services/admin-service.js';
+import { adminRoutes } from './routes/admin.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -231,6 +233,14 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   await server.register(
     async (instance) => {
       await analyticsRoutes(instance, analyticsService);
+    },
+    { prefix: '/api/v1' }
+  );
+
+  const adminService = new AdminService(db);
+  await server.register(
+    async (instance) => {
+      await adminRoutes(instance, adminService);
     },
     { prefix: '/api/v1' }
   );
