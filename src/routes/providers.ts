@@ -5,6 +5,7 @@ import {
   ProviderListRequestSchema,
   HealthCheckResponseSchema
 } from '../types/index.js';
+import { ProviderVerifier } from '../services/provider-verifier.js';
 
 /**
  * Provider routes plugin
@@ -21,6 +22,17 @@ export async function providersRoutes(
   fastify.post('/providers', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const announcement = ProviderAnnouncementSchema.parse(request.body);
+
+      // Verify provider endpoint is reachable
+      const verifier = new ProviderVerifier();
+      const verification = await verifier.verifyEndpoint(announcement.endpoint);
+      if (!verification.reachable) {
+        return reply.status(422).send({
+          error: 'Provider endpoint unreachable',
+          details: verification.errors,
+        });
+      }
+
       discoveryService.registerProvider(announcement);
 
       fastify.log.info(`Provider registered: ${announcement.provider.name} (${announcement.provider.id})`);
