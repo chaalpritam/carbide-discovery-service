@@ -32,6 +32,7 @@ import { WebhookService } from './services/webhook-service.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 import { AdminService } from './services/admin-service.js';
 import { adminRoutes } from './routes/admin.js';
+import { RegistryIndexer } from './services/registry-indexer.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -282,6 +283,30 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   );
   contractLifecycle.start(60_000);
 
+  // Start the on-chain registry indexer when a CarbideRegistry address
+  // is configured. Failures don't prevent the server from coming up:
+  // the HTTP registration path still works standalone, this just means
+  // the service won't mirror on-chain providers until operators fix
+  // the RPC/address.
+  let registryIndexer: RegistryIndexer | null = null;
+  if (config.registryContract) {
+    registryIndexer = new RegistryIndexer(
+      db,
+      {
+        rpcUrl: config.rpcUrl,
+        registryAddress: config.registryContract,
+      },
+      server.log
+    );
+    registryIndexer.start().catch((err) => {
+      server.log.error({ err }, 'registry indexer failed to start');
+    });
+  } else {
+    server.log.info(
+      'REGISTRY_CONTRACT not set; on-chain registry indexer disabled'
+    );
+  }
+
   // Graceful shutdown with 30-second timeout
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   signals.forEach((signal) => {
@@ -290,6 +315,11 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
       healthChecker.stop();
       statsUpdater.stop();
       contractLifecycle.stop();
+      if (registryIndexer) {
+        await registryIndexer.stop().catch((err) => {
+          server.log.warn({ err }, 'registry indexer stop failed');
+        });
+      }
 
       // Force exit if graceful close takes too long (e.g. stuck connections)
       const forceTimer = setTimeout(() => {

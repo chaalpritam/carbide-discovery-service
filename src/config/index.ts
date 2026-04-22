@@ -22,6 +22,7 @@ export interface DiscoveryConfig {
   usdcAddress: string;              // USDC token contract address
   chainId: number;                  // Blockchain chain ID
   rpcUrl: string;                   // Blockchain RPC endpoint
+  registryContract: string;         // CarbideRegistry address (empty disables indexer)
 }
 
 /**
@@ -74,5 +75,6 @@ export function loadConfig(): DiscoveryConfig {
     usdcAddress: process.env.USDC_ADDRESS ?? '',
     chainId: parseInt(process.env.CHAIN_ID ?? '421614', 10),
     rpcUrl: process.env.RPC_URL ?? 'https://sepolia-rollup.arbitrum.io/rpc',
+    registryContract: process.env.REGISTRY_CONTRACT ?? '',
   };
 }

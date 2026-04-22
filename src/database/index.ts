@@ -36,7 +36,7 @@ function runMigrations(db: Database.Database): void {
   `);
 
   const migrationDir = resolve(__dirname, 'migrations');
-  const migrationFiles = ['001_initial.sql', '002_file_providers.sql', '003_api_keys.sql', '004_audit_log.sql', '005_users.sql', '006_provider_wallet.sql', '007_contracts_payments.sql', '008_proof_log.sql', '009_reputation_events.sql', '010_disputes.sql', '011_webhooks.sql', '012_usage_snapshots.sql'];
+  const migrationFiles = ['001_initial.sql', '002_file_providers.sql', '003_api_keys.sql', '004_audit_log.sql', '005_users.sql', '006_provider_wallet.sql', '007_contracts_payments.sql', '008_proof_log.sql', '009_reputation_events.sql', '010_disputes.sql', '011_webhooks.sql', '012_usage_snapshots.sql', '013_provider_source.sql'];
 
   const applied = new Set(
     db.prepare('SELECT name FROM _migrations').all()
