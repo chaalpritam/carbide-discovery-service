@@ -1,6 +1,5 @@
 import type Database from 'better-sqlite3';
 import { ContractService } from './contract-service.js';
-import { PaymentSigner } from './payment-signer.js';
 import { ReputationService } from './reputation-service.js';
 
 export interface ProofSubmission {
@@ -12,20 +11,17 @@ export interface ProofSubmission {
 export interface ProofVerificationResult {
   valid: boolean;
   period?: number;
-  attestation_signature?: string;
   message: string;
 }
 
 export class ProofVerifierService {
   private db: Database.Database;
   private contractService: ContractService;
-  private paymentSigner: PaymentSigner | null;
   private reputationService: ReputationService | null;
 
-  constructor(db: Database.Database, paymentSigner: PaymentSigner | null, reputationService?: ReputationService | null) {
+  constructor(db: Database.Database, reputationService?: ReputationService | null) {
     this.db = db;
     this.contractService = new ContractService(db);
-    this.paymentSigner = paymentSigner;
     this.reputationService = reputationService ?? null;
   }
 
@@ -95,36 +91,7 @@ export class ProofVerifierService {
       this.reputationService.recalculateScore(contract.provider_id);
     }
 
-    // Check if a payment period is due and sign attestation
     const period = contract.proofs_submitted + 1;
-    if (this.paymentSigner && contract.escrow_id !== null && contract.total_escrowed !== '0') {
-      const periodAmount = BigInt(contract.total_escrowed) / BigInt(contract.duration_months);
-      try {
-        const signature = await this.paymentSigner.signRelease(
-          BigInt(contract.escrow_id),
-          period,
-          contract.provider_id,
-          periodAmount,
-          `0x${proof.response_hash}`
-        );
-
-        // Store attestation
-        this.db.prepare(
-          `UPDATE proof_log SET attestation_signature = ? WHERE contract_id = ? AND challenge_id = ?`
-        ).run(signature, contractId, proof.challenge_id);
-
-        return {
-          valid: true,
-          period,
-          attestation_signature: signature,
-          message: 'Proof verified, payment attestation signed',
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { valid: true, period, message: `Proof valid but signing failed: ${message}` };
-      }
-    }
-
     return { valid: true, period, message: 'Proof verified successfully' };
   }
 

@@ -2,11 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { initDatabase } from '../../src/database/index.js';
 import { ProofVerifierService, type ProofSubmission } from '../../src/services/proof-verifier.js';
-import { PaymentSigner } from '../../src/services/payment-signer.js';
 import { ContractService } from '../../src/services/contract-service.js';
 import { ReputationService } from '../../src/services/reputation-service.js';
 import { randomUUID } from 'node:crypto';
-import { ethers } from 'ethers';
 
 describe('ProofVerifierService', () => {
   let db: Database.Database;
@@ -52,7 +50,7 @@ describe('ProofVerifierService', () => {
     db = initDatabase(':memory:');
     contractService = new ContractService(db);
     reputationService = new ReputationService(db);
-    verifier = new ProofVerifierService(db, null, reputationService);
+    verifier = new ProofVerifierService(db, reputationService);
 
     defaultProviderId = randomUUID();
     insertProvider(defaultProviderId);
@@ -163,36 +161,6 @@ describe('ProofVerifierService', () => {
 
     const updated = contractService.getContract(contract.id)!;
     expect(updated.last_proof_at).not.toBeNull();
-  });
-
-  it('returns attestation_signature when escrow_id set (with PaymentSigner)', async () => {
-    // Create a PaymentSigner with a test private key
-    const testWallet = ethers.Wallet.createRandom();
-    const providerAddress = testWallet.address; // Valid Ethereum address
-    const signerWallet = ethers.Wallet.createRandom();
-    const signer = new PaymentSigner(signerWallet.privateKey, 421614, '0x' + '11'.repeat(20));
-    const verifierWithSigner = new ProofVerifierService(db, signer);
-
-    // Temporarily disable FK checks so we can use an Ethereum address as provider_id
-    db.pragma('foreign_keys = OFF');
-    const contractId = randomUUID();
-    db.prepare(
-      `INSERT INTO storage_contracts (id, client_id, provider_id, price_per_gb_month, duration_months, status, escrow_id, total_escrowed)
-       VALUES (?, ?, ?, '0.005', 12, 'active', 1, '12000000')`
-    ).run(contractId, randomUUID(), providerAddress);
-    db.pragma('foreign_keys = ON');
-
-    // Use a 32-byte hex response_hash so EIP-712 bytes32 parsing succeeds
-    const signingProof: ProofSubmission = {
-      challenge_id: 'test-challenge-signing',
-      response_hash: 'aa'.repeat(32), // 32 bytes hex
-      merkle_proofs: [{ chunk_index: 0, chunk_hash: 'aaa', merkle_path: ['bbb'] }],
-    };
-
-    const result = await verifierWithSigner.verifyProof(contractId, signingProof);
-    expect(result.valid).toBe(true);
-    expect(result.attestation_signature).toBeDefined();
-    expect(result.attestation_signature).toMatch(/^0x/);
   });
 
   describe('getProofHistory', () => {
