@@ -37,6 +37,8 @@ import { requestIdHook } from './middleware/request-id.js';
 import { createAuditLogger } from './middleware/audit-logger.js';
 import { metricsOnRequest, metricsOnResponse } from './middleware/metrics.js';
 import { metricsRoutes } from './routes/metrics.js';
+import { SolanaIndexer } from './services/solana-indexer.js';
+import { SolanaPaymentSigner } from './services/solana-payment-signer.js';
 
 /**
  * Create and configure the Fastify server
@@ -139,6 +141,24 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
 
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
+
+  // Optional Solana verifier signer (loaded if a keypair path is configured).
+  // Used by future release-attestation flows; logged at boot for observability.
+  let paymentSigner: SolanaPaymentSigner | null = null;
+  if (config.verifierKeypairPath) {
+    try {
+      paymentSigner = SolanaPaymentSigner.fromKeypairFile(config.verifierKeypairPath);
+      server.log.info(
+        { verifier: paymentSigner.getAddress() },
+        'solana payment signer loaded',
+      );
+    } catch (err) {
+      server.log.warn(
+        { err, path: config.verifierKeypairPath },
+        'failed to load verifier keypair; release attestations disabled',
+      );
+    }
+  }
 
   const reputationService = new ReputationService(db);
 
@@ -276,6 +296,29 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   );
   contractLifecycle.start(60_000);
 
+  // Start the on-chain registry indexer when a registry program ID is
+  // configured. Failures don't prevent the server from coming up — the
+  // HTTP /providers path still works standalone, this just means we
+  // won't mirror on-chain providers until the operator fixes the RPC
+  // or program ID.
+  let solanaIndexer: SolanaIndexer | null = null;
+  if (config.registryProgramId) {
+    solanaIndexer = new SolanaIndexer(
+      db,
+      {
+        rpcUrl: config.solanaRpcUrl,
+        wsUrl: config.solanaWsUrl || undefined,
+        registryProgramId: config.registryProgramId,
+      },
+      server.log,
+    );
+    solanaIndexer.start().catch((err) => {
+      server.log.error({ err }, 'solana indexer failed to start');
+    });
+  } else {
+    server.log.info('CARBIDE_REGISTRY_PROGRAM_ID not set; on-chain indexer disabled');
+  }
+
   // Graceful shutdown with 30-second timeout
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   signals.forEach((signal) => {
@@ -284,6 +327,11 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
       healthChecker.stop();
       statsUpdater.stop();
       contractLifecycle.stop();
+      if (solanaIndexer) {
+        await solanaIndexer.stop().catch((err) => {
+          server.log.warn({ err }, 'solana indexer stop failed');
+        });
+      }
 
       // Force exit if graceful close takes too long (e.g. stuck connections)
       const forceTimer = setTimeout(() => {
