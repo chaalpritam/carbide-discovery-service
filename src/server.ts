@@ -16,7 +16,6 @@ import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
 import { contractsRoutes } from './routes/contracts.js';
 import { proofsRoutes } from './routes/proofs.js';
-import { PaymentSigner } from './services/payment-signer.js';
 import { ProofVerifierService } from './services/proof-verifier.js';
 import { ReputationService } from './services/reputation-service.js';
 import { reputationRoutes } from './routes/reputation.js';
@@ -32,7 +31,6 @@ import { WebhookService } from './services/webhook-service.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 import { AdminService } from './services/admin-service.js';
 import { adminRoutes } from './routes/admin.js';
-import { RegistryIndexer } from './services/registry-indexer.js';
 import { createAuthHook } from './middleware/auth.js';
 import helmet from '@fastify/helmet';
 import { requestIdHook } from './middleware/request-id.js';
@@ -142,14 +140,9 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   // Create discovery service with database
   const discoveryService = new DiscoveryService(config, db);
 
-  // Create payment signer (only if verifier key is configured)
-  const paymentSigner = config.verifierPrivateKey
-    ? new PaymentSigner(config.verifierPrivateKey, config.chainId, config.escrowContract)
-    : null;
-
   const reputationService = new ReputationService(db);
 
-  const proofVerifier = new ProofVerifierService(db, paymentSigner, reputationService);
+  const proofVerifier = new ProofVerifierService(db, reputationService);
 
   // Register routes
   await server.register(
@@ -283,30 +276,6 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
   );
   contractLifecycle.start(60_000);
 
-  // Start the on-chain registry indexer when a CarbideRegistry address
-  // is configured. Failures don't prevent the server from coming up:
-  // the HTTP registration path still works standalone, this just means
-  // the service won't mirror on-chain providers until operators fix
-  // the RPC/address.
-  let registryIndexer: RegistryIndexer | null = null;
-  if (config.registryContract) {
-    registryIndexer = new RegistryIndexer(
-      db,
-      {
-        rpcUrl: config.rpcUrl,
-        registryAddress: config.registryContract,
-      },
-      server.log
-    );
-    registryIndexer.start().catch((err) => {
-      server.log.error({ err }, 'registry indexer failed to start');
-    });
-  } else {
-    server.log.info(
-      'REGISTRY_CONTRACT not set; on-chain registry indexer disabled'
-    );
-  }
-
   // Graceful shutdown with 30-second timeout
   const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   signals.forEach((signal) => {
@@ -315,11 +284,6 @@ async function createServer(): Promise<{ server: FastifyInstance; config: Discov
       healthChecker.stop();
       statsUpdater.stop();
       contractLifecycle.stop();
-      if (registryIndexer) {
-        await registryIndexer.stop().catch((err) => {
-          server.log.warn({ err }, 'registry indexer stop failed');
-        });
-      }
 
       // Force exit if graceful close takes too long (e.g. stuck connections)
       const forceTimer = setTimeout(() => {

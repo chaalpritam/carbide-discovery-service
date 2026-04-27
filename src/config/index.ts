@@ -17,12 +17,6 @@ export interface DiscoveryConfig {
   authSecret: string;               // Secret for bootstrap endpoint
   jwtSecret: string;                // Secret for signing JWTs
   jwtExpiresIn: string;             // JWT token expiry (e.g., '1h', '30m')
-  verifierPrivateKey: string;       // Private key for payment attestation signing
-  escrowContract: string;           // Escrow contract address
-  usdcAddress: string;              // USDC token contract address
-  chainId: number;                  // Blockchain chain ID
-  rpcUrl: string;                   // Blockchain RPC endpoint
-  registryContract: string;         // CarbideRegistry address (empty disables indexer)
 }
 
 /**
@@ -70,11 +64,5 @@ export function loadConfig(): DiscoveryConfig {
     authSecret: process.env.AUTH_SECRET || 'changeme-in-production',
     jwtSecret: process.env.JWT_SECRET || 'jwt-changeme-in-production',
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
-    verifierPrivateKey: process.env.VERIFIER_PRIVATE_KEY ?? '',
-    escrowContract: process.env.ESCROW_CONTRACT ?? '',
-    usdcAddress: process.env.USDC_ADDRESS ?? '',
-    chainId: parseInt(process.env.CHAIN_ID ?? '421614', 10),
-    rpcUrl: process.env.RPC_URL ?? 'https://sepolia-rollup.arbitrum.io/rpc',
-    registryContract: process.env.REGISTRY_CONTRACT ?? '',
   };
 }
