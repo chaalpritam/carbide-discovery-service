@@ -17,6 +17,13 @@ export interface DiscoveryConfig {
   authSecret: string;               // Secret for bootstrap endpoint
   jwtSecret: string;                // Secret for signing JWTs
   jwtExpiresIn: string;             // JWT token expiry (e.g., '1h', '30m')
+  solanaCluster: string;            // Cluster label (devnet | mainnet-beta | ...)
+  solanaRpcUrl: string;             // JSON-RPC endpoint
+  solanaWsUrl: string;              // Optional explicit websocket endpoint (empty = derived from RPC)
+  registryProgramId: string;        // carbide_registry program ID (empty disables indexer)
+  escrowProgramId: string;          // carbide_escrow program ID
+  usdcMint: string;                 // SPL token mint used for payments
+  verifierKeypairPath: string;      // Path to a solana-keygen JSON keypair for the verifier
 }
 
 /**
@@ -64,5 +71,12 @@ export function loadConfig(): DiscoveryConfig {
     authSecret: process.env.AUTH_SECRET || 'changeme-in-production',
     jwtSecret: process.env.JWT_SECRET || 'jwt-changeme-in-production',
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+    solanaCluster: process.env.CARBIDE_SOLANA_CLUSTER ?? 'devnet',
+    solanaRpcUrl: process.env.CARBIDE_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com',
+    solanaWsUrl: process.env.CARBIDE_SOLANA_WS_URL ?? '',
+    registryProgramId: process.env.CARBIDE_REGISTRY_PROGRAM_ID ?? '',
+    escrowProgramId: process.env.CARBIDE_ESCROW_PROGRAM_ID ?? '',
+    usdcMint: process.env.CARBIDE_USDC_MINT ?? '',
+    verifierKeypairPath: process.env.CARBIDE_VERIFIER_KEYPAIR_PATH ?? '',
   };
 }
