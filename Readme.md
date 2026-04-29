@@ -1,103 +1,126 @@
 # Carbide Discovery Service
 
-A standalone Node.js + TypeScript microservice that provides provider discovery and marketplace functionality for the Carbide Network decentralized storage system.
+Standalone Node.js + TypeScript microservice that powers provider discovery and marketplace coordination for the Carbide Network. Providers self-register here on heartbeat; clients query this service to find providers, request quotes, and read marketplace stats.
 
-## Overview
+## What it does
 
-The Carbide Discovery Service acts as a central registry and matchmaker for the decentralized storage marketplace:
+- **Provider registry** — tracks active provider nodes (region, tier, price, capacity, reputation).
+- **Heartbeat & health checks** — providers POST a heartbeat; a background job pings each one every 30s and removes any that fail 5 consecutive checks.
+- **Marketplace search** — query providers by region, tier, minimum reputation; sort by price or reputation.
+- **Quote aggregation** — fan-out quote requests to N providers in parallel and return the responses.
+- **Stats** — total providers, capacity available, average price.
 
-- **Provider Registry**: Tracks all active storage provider nodes worldwide
-- **Health Monitoring**: Automatic health checks every 30 seconds, auto-removes unresponsive providers
-- **Marketplace Search**: Find providers by region, tier, and reputation
-- **Quote Aggregation**: Request quotes from multiple providers in parallel
-- **Statistics**: Real-time marketplace metrics
+11 REST endpoints under `/api/v1`. CORS is on by default so browser clients can talk to it directly.
 
-## Features
-
-✅ **11 HTTP Endpoints** - Complete REST API for provider management  
-✅ **Background Health Checks** - Automatic provider monitoring every 30s  
-✅ **Auto-removal** - Providers with 5+ failed health checks are removed  
-✅ **Regional Indexing** - Fast lookups by geographic region  
-✅ **Tier-based Search** - Filter by provider tier  
-✅ **Reputation Ranking** - Search results sorted by reputation score  
-✅ **CORS Enabled** - Ready for client applications  
-✅ **Cloud Deployment** - Deployable to Railway, Render, AWS  
-
-## Tech Stack
+## Tech stack
 
 - **Runtime**: Node.js 20+
-- **Framework**: Fastify 4.x (high-performance HTTP)
-- **Language**: TypeScript 5.x
-- **Validation**: Zod (runtime type checking)
-- **Storage**: In-memory (with Redis migration path)
-- **Logging**: Pino (structured logging)
+- **Framework**: Fastify 4
+- **Language**: TypeScript 5
+- **Validation**: Zod
+- **Storage**: in-memory (Redis-backed mode is on the roadmap)
+- **Logging**: Pino (structured JSON)
 
-## Quick Start
+## Running locally
 
-### Installation
-
-\`\`\`bash
-# Install dependencies
+```sh
 npm install
+cp .env.example .env     # edit if you want to override defaults
+npm run dev              # tsx watch — auto-reloads on save
+```
 
-# Copy environment variables
-cp .env.example .env
+The dev server defaults to `http://localhost:9090`. Health check:
 
-# Start development server
-npm run dev
-\`\`\`
+```sh
+curl http://localhost:9090/api/v1/health
+```
 
-### Environment Variables
+### Pointing a provider at your local discovery
 
-Create a \`.env\` file:
+On the provider machine, set the discovery URL in `provider.toml` (or via env var):
 
-\`\`\`env
-PORT=9090
-HOST=0.0.0.0
-NODE_ENV=development
-HEALTH_CHECK_INTERVAL=30000
-PROVIDER_TIMEOUT=300000
-MAX_SEARCH_RESULTS=100
-LOG_LEVEL=info
-\`\`\`
+```toml
+[network]
+discovery_endpoint = "http://<this-machine-lan-ip>:9090"
+```
 
-## API Documentation
+Restart the provider; on its next heartbeat it will appear in `GET /api/v1/providers`.
 
-Base URL: \`http://localhost:9090/api/v1\`
+### Tests
 
-### Provider Management Endpoints
+```sh
+npm test               # vitest run
+npm run test:watch     # watch mode
+npm run typecheck      # tsc --noEmit
+```
 
-- \`POST /api/v1/providers\` - Register provider
-- \`GET /api/v1/providers\` - List providers (with filters)
-- \`GET /api/v1/providers/:id\` - Get specific provider
-- \`DELETE /api/v1/providers/:id\` - Unregister provider
-- \`POST /api/v1/providers/:id/heartbeat\` - Update heartbeat
+## Running in production
 
-### Marketplace Endpoints
+The repo includes a `Dockerfile` for a Node 20 production image, plus `npm run build` / `npm start` for bare-metal or PaaS hosting.
 
-- \`GET /api/v1/marketplace/search\` - Search providers
-- \`POST /api/v1/marketplace/quotes\` - Request quotes
-- \`GET /api/v1/marketplace/stats\` - Get statistics
+### Docker
 
-### Health Check
+```sh
+docker build -t carbide-discovery .
+docker run --rm -p 9090:9090 \
+  -e NODE_ENV=production \
+  -e LOG_LEVEL=info \
+  carbide-discovery
+```
 
-- \`GET /api/v1/health\` - Service health status
+### Direct (PaaS / VM)
 
-For detailed API documentation with examples, see the implementation plan.
+```sh
+npm ci --omit=dev      # install only production deps
+npm run build          # tsc → dist/
+npm start              # node dist/server.js
+```
 
-## Deployment
+### PaaS notes
 
-### Railway
+- **Railway**: connect the GitHub repo, set the env vars in the dashboard, auto-deploys on push to `main`.
+- **Render**: new Web Service → build `npm install && npm run build`, start `npm start`.
+- **Fly.io / ECS / GKE**: use the bundled `Dockerfile`.
 
-1. Connect GitHub repository
-2. Set environment variables in dashboard
-3. Auto-deploys on push to main
+Whichever host you pick, point your DNS at it and tell every provider to set `discovery_endpoint` to your public URL. The provider laptop in the brew install bundles `https://discovery.carbide.network` as the default; override that in `provider.toml` if you run your own.
 
-### Render
+### Environment variables
 
-1. Create new Web Service
-2. Build command: \`npm install && npm run build\`
-3. Start command: \`npm start\`
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PORT` | `9090` | HTTP listen port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `NODE_ENV` | `development` | Set to `production` when deployed |
+| `HEALTH_CHECK_INTERVAL` | `30000` | ms between provider health pings |
+| `PROVIDER_TIMEOUT` | `300000` | ms before a silent provider is considered stale |
+| `MAX_SEARCH_RESULTS` | `100` | Cap on marketplace search results |
+| `LOG_LEVEL` | `info` | Pino level (`trace`/`debug`/`info`/`warn`/`error`) |
+
+The repo ships an `.env.example` with the full list including Solana-related keys for the on-chain registry mirror.
+
+## API surface
+
+Base URL: `/api/v1`.
+
+### Providers
+
+- `POST   /providers` — register
+- `GET    /providers` — list (filters: `region`, `tier`, `minReputation`, `limit`)
+- `GET    /providers/:id` — fetch one
+- `DELETE /providers/:id` — unregister
+- `POST   /providers/:id/heartbeat` — keepalive
+
+### Marketplace
+
+- `GET  /marketplace/search` — search providers
+- `POST /marketplace/quotes` — fan-out quote request
+- `GET  /marketplace/stats` — totals and averages
+
+### Health
+
+- `GET /health`
+
+Detailed schemas (request/response shapes, error codes) live in [`carbide-dev-docs/DISCOVERY_SERVICE.md`](../carbide-dev-docs/DISCOVERY_SERVICE.md).
 
 ## License
 
